@@ -1,0 +1,6 @@
+{
+  test: /\.m?js/,
+  resolve: {
+    fullySpecified: false // разрешает "@mui/material/styles" без ".js"
+  }
+}
