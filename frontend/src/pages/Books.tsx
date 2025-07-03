@@ -25,6 +25,10 @@ import { useRootStore } from '../stores/RootStore';
 import BookDialog from '../components/Books/BookDialog';
 import BarcodeScanner from '../components/Common/BarcodeScanner';
 import ConfirmDialog from '../components/Common/ConfirmDialog';
+import ExportDialog from '../components/Common/ExportDialog';
+import ImportDialog from '../components/Common/ImportDialog';
+import { exportBooksToExcel } from '../utils/excelUtils';
+import { importFromExcel } from '../utils/excelUtils';
 
 const Books: React.FC = observer(() => {
     const { bookStore, uiStore } = useRootStore();
@@ -34,6 +38,8 @@ const Books: React.FC = observer(() => {
     const [openScanner, setOpenScanner] = useState(false);
     const [openConfirm, setOpenConfirm] = useState(false);
     const [bookToDelete, setBookToDelete] = useState(null);
+    const [exportDialogOpen, setExportDialogOpen] = useState(false);
+    const [importDialogOpen, setImportDialogOpen] = useState(false);
 
     useEffect(() => {
         bookStore.loadBooks();
@@ -125,15 +131,47 @@ const Books: React.FC = observer(() => {
         uiStore.showNotification('Печать штрих-кодов в разработке', 'info');
     };
 
-    const handleImport = () => {
-        // Implement Excel import
-        uiStore.showNotification('Импорт из Excel в разработке', 'info');
+    const handleImport = async (file: File) => {
+        const data = await importFromExcel({
+            file,
+            headers: {
+                code: 'Код',
+                title: 'Название',
+                // ... маппинг полей
+            }
+        });
+
+        // Обработка импортированных данных
+        let success = 0;
+        let failed = 0;
+        const errors = [];
+
+        for (const item of data) {
+            try {
+                await bookStore.createBook(item);
+                success++;
+            } catch (error) {
+                failed++;
+                errors.push({ row: data.indexOf(item) + 2, error: error.message });
+            }
+        }
+
+        return { success, failed, errors };
     };
 
-    const handleExport = () => {
-        // Implement Excel export
-        bookStore.exportToExcel();
+    const handleExport = async (selectedFields: string[]) => {
+        // Фильтруем данные по выбранным полям
+        const exportData = bookStore.books.map(book => {
+            const filtered: any = {};
+            selectedFields.forEach(field => {
+                filtered[field] = book[field];
+            });
+            return filtered;
+        });
+
+        exportBooksToExcel(exportData);
     };
+
 
     return (
         <Box>
@@ -164,6 +202,13 @@ const Books: React.FC = observer(() => {
                     >
                         Импорт из Excel
                     </Button>
+                    <ImportDialog
+                        open={importDialogOpen}
+                        onClose={() => setImportDialogOpen(false)}
+                        title="Импорт книг"
+                        templateUrl="/templates/books_template.xlsx"
+                        onImport={handleImport}
+                    />
                     <Button
                         variant="outlined"
                         startIcon={<FileDownload />}
@@ -171,6 +216,18 @@ const Books: React.FC = observer(() => {
                     >
                         Экспорт в Excel
                     </Button>
+                    <ExportDialog
+                        open={exportDialogOpen}
+                        onClose={() => setExportDialogOpen(false)}
+                        title="Экспорт книг"
+                        fields={[
+                            { key: 'code', label: 'Код', selected: true },
+                            { key: 'title', label: 'Название', selected: true },
+                            { key: 'author', label: 'Автор', selected: true },
+                            // ... другие поля
+                        ]}
+                        onExport={handleExport}
+                    />
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>

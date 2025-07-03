@@ -38,6 +38,7 @@ import {
     CalendarMonth,
 } from '@mui/icons-material';
 import { useRootStore } from '../../stores/RootStore';
+import NotificationManager from '../Common/NotificationManager';
 
 const drawerWidth = 240;
 
@@ -60,6 +61,7 @@ const Layout: React.FC = observer(() => {
     const { authStore, uiStore } = useRootStore();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
@@ -71,6 +73,16 @@ const Layout: React.FC = observer(() => {
 
     const handleMenuClose = () => {
         setAnchorEl(null);
+    };
+
+    const handleNotificationClick = (event: React.MouseEvent<HTMLElement>) => {
+        setNotificationAnchorEl(event.currentTarget);
+        // Сбрасываем счетчик уведомлений
+        uiStore.notificationCount = 0;
+    };
+
+    const handleNotificationClose = () => {
+        setNotificationAnchorEl(null);
     };
 
     const handleLogout = () => {
@@ -130,7 +142,11 @@ const Layout: React.FC = observer(() => {
                         Библиотечная система
                     </Typography>
 
-                    <IconButton color="inherit" sx={{ mr: 1 }}>
+                    <IconButton
+                        color="inherit"
+                        sx={{ mr: 1 }}
+                        onClick={handleNotificationClick}
+                    >
                         <Badge badgeContent={uiStore.notificationCount} color="error">
                             <Notifications />
                         </Badge>
@@ -140,7 +156,7 @@ const Layout: React.FC = observer(() => {
                         <CalendarMonth />
                     </IconButton>
 
-                    <IconButton color="inherit" sx={{ mr: 2 }}>
+                    <IconButton color="inherit" sx={{ mr: 2 }} onClick={() => navigate('/email')}>
                         <Mail />
                     </IconButton>
 
@@ -167,6 +183,67 @@ const Layout: React.FC = observer(() => {
                             </ListItemIcon>
                             Выйти
                         </MenuItem>
+                    </Menu>
+
+                    {/* Меню уведомлений */}
+                    <Menu
+                        anchorEl={notificationAnchorEl}
+                        open={Boolean(notificationAnchorEl)}
+                        onClose={handleNotificationClose}
+                        PaperProps={{
+                            style: {
+                                maxHeight: 400,
+                                width: '300px',
+                            },
+                        }}
+                    >
+                        {uiStore.notifications.length === 0 ? (
+                            <MenuItem disabled>
+                                <Typography variant="body2" color="text.secondary">
+                                    Нет новых уведомлений
+                                </Typography>
+                            </MenuItem>
+                        ) : (
+                            <>
+                                <MenuItem disabled>
+                                    <Typography variant="subtitle2">
+                                        Уведомления ({uiStore.notifications.length})
+                                    </Typography>
+                                </MenuItem>
+                                <Divider />
+                                {uiStore.notifications.map((notification) => (
+                                    <MenuItem
+                                        key={notification.id}
+                                        onClick={() => {
+                                            uiStore.removeNotification(notification.id);
+                                            if (uiStore.notifications.length === 1) {
+                                                handleNotificationClose();
+                                            }
+                                        }}
+                                    >
+                                        <Box>
+                                            <Typography variant="body2">
+                                                {notification.message}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {new Date(notification.timestamp).toLocaleTimeString()}
+                                            </Typography>
+                                        </Box>
+                                    </MenuItem>
+                                ))}
+                                <Divider />
+                                <MenuItem
+                                    onClick={() => {
+                                        uiStore.clearNotifications();
+                                        handleNotificationClose();
+                                    }}
+                                >
+                                    <Typography variant="body2" color="primary">
+                                        Очистить все
+                                    </Typography>
+                                </MenuItem>
+                            </>
+                        )}
                     </Menu>
                 </Toolbar>
             </AppBar>
@@ -212,6 +289,9 @@ const Layout: React.FC = observer(() => {
             >
                 <Outlet />
             </Box>
+
+            {/* Компонент для отображения уведомлений */}
+            <NotificationManager />
         </Box>
     );
 });

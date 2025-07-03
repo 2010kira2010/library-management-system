@@ -1,191 +1,115 @@
-import React, { useEffect, useState } from 'react';
-import { observer } from 'mobx-react-lite';
+import React, { useState } from 'react';
 import {
     Box,
     Paper,
+    Tabs,
+    Tab,
     Typography,
-    TextField,
-    Button,
-    Grid,
-    List,
-    ListItem,
-    ListItemText,
-    ListItemSecondaryAction,
-    IconButton,
 } from '@mui/material';
 import {
-    Save,
-    Add,
-    Edit,
-    Delete,
+    School,
+    People,
+    Business,
+    Email,
 } from '@mui/icons-material';
-import { useRootStore } from '../stores/RootStore';
+import ClassSettings from '../components/Settings/ClassSettings';
+import StaffSettings from '../components/Settings/StaffSettings';
+import OrganizationSettings from '../components/Settings/OrganizationSettings';
+import EmailSettings from '../components/Settings/EmailSettings';
 
-const Settings: React.FC = observer(() => {
-    const { settingsStore } = useRootStore();
-    const [organizationData, setOrganizationData] = useState({
-        organization_name: '',
-        organization_short_name: '',
-        director_name: '',
-    });
+interface TabPanelProps {
+    children?: React.ReactNode;
+    index: number;
+    value: number;
+}
 
-    useEffect(() => {
-        settingsStore.loadSettings();
-    }, []);
+function TabPanel(props: TabPanelProps) {
+    const { children, value, index, ...other } = props;
 
-    useEffect(() => {
-        if (settingsStore.settings) {
-            setOrganizationData({
-                organization_name: settingsStore.settings.organization_name || '',
-                organization_short_name: settingsStore.settings.organization_short_name || '',
-                director_name: settingsStore.settings.director_name || '',
-            });
-        }
-    }, [settingsStore.settings]);
+    return (
+        <div
+            role="tabpanel"
+            hidden={value !== index}
+            id={`settings-tabpanel-${index}`}
+            aria-labelledby={`settings-tab-${index}`}
+            {...other}
+        >
+            {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+        </div>
+    );
+}
 
-    const handleSaveOrganization = async () => {
-        await settingsStore.updateSettings(organizationData);
+function a11yProps(index: number) {
+    return {
+        id: `settings-tab-${index}`,
+        'aria-controls': `settings-tabpanel-${index}`,
+    };
+}
+
+const Settings: React.FC = () => {
+    const [value, setValue] = useState(0);
+
+    const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+        setValue(newValue);
     };
 
     return (
         <Box>
             <Typography variant="h4" gutterBottom>
-                Настройка
+                Настройки системы
             </Typography>
 
-            <Grid container spacing={3}>
-                {/* Настройки организации */}
-                <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 3 }}>
-                        <Typography variant="h6" gutterBottom>
-                            Наименование организации
-                        </Typography>
+            <Paper sx={{ width: '100%', mt: 3 }}>
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                    <Tabs
+                        value={value}
+                        onChange={handleChange}
+                        aria-label="settings tabs"
+                        variant="scrollable"
+                        scrollButtons="auto"
+                    >
+                        <Tab
+                            icon={<School />}
+                            iconPosition="start"
+                            label="Классы"
+                            {...a11yProps(0)}
+                        />
+                        <Tab
+                            icon={<People />}
+                            iconPosition="start"
+                            label="Сотрудники"
+                            {...a11yProps(1)}
+                        />
+                        <Tab
+                            icon={<Business />}
+                            iconPosition="start"
+                            label="Организация"
+                            {...a11yProps(2)}
+                        />
+                        <Tab
+                            icon={<Email />}
+                            iconPosition="start"
+                            label="Email"
+                            {...a11yProps(3)}
+                        />
+                    </Tabs>
+                </Box>
 
-                        <Grid container spacing={2}>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Полное наименование"
-                                    value={organizationData.organization_name}
-                                    onChange={(e) => setOrganizationData({
-                                        ...organizationData,
-                                        organization_name: e.target.value,
-                                    })}
-                                    multiline
-                                    rows={2}
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Краткое наименование"
-                                    value={organizationData.organization_short_name}
-                                    onChange={(e) => setOrganizationData({
-                                        ...organizationData,
-                                        organization_short_name: e.target.value,
-                                    })}
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Руководитель"
-                                    value={organizationData.director_name}
-                                    onChange={(e) => setOrganizationData({
-                                        ...organizationData,
-                                        director_name: e.target.value,
-                                    })}
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <Button
-                                    variant="contained"
-                                    startIcon={<Save />}
-                                    onClick={handleSaveOrganization}
-                                >
-                                    Сохранить
-                                </Button>
-                            </Grid>
-                        </Grid>
-                    </Paper>
-                </Grid>
-
-                {/* Настройка классов */}
-                <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 3 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="h6">
-                                Настройка классов
-                            </Typography>
-                            <Button
-                                size="small"
-                                startIcon={<Add />}
-                                onClick={() => console.log('Add class')}
-                            >
-                                Добавить класс
-                            </Button>
-                        </Box>
-
-                        <List>
-                            {settingsStore.classes.map((cls) => (
-                                <ListItem key={cls.id}>
-                                    <ListItemText
-                                        primary={`${cls.grade} "${cls.letter}"`}
-                                        secondary={cls.teacher_name || 'Классный руководитель не указан'}
-                                    />
-                                    <ListItemSecondaryAction>
-                                        <IconButton edge="end" size="small">
-                                            <Edit />
-                                        </IconButton>
-                                        <IconButton edge="end" size="small">
-                                            <Delete />
-                                        </IconButton>
-                                    </ListItemSecondaryAction>
-                                </ListItem>
-                            ))}
-                        </List>
-                    </Paper>
-                </Grid>
-
-                {/* Сотрудники библиотеки */}
-                <Grid item xs={12}>
-                    <Paper sx={{ p: 3 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="h6">
-                                Сотрудники библиотеки
-                            </Typography>
-                            <Button
-                                size="small"
-                                startIcon={<Add />}
-                                onClick={() => console.log('Add user')}
-                            >
-                                Добавить
-                            </Button>
-                        </Box>
-
-                        <List>
-                            {settingsStore.libraryUsers.map((user) => (
-                                <ListItem key={user.id}>
-                                    <ListItemText
-                                        primary={user.full_name}
-                                        secondary={`Логин: ${user.username} • Роль: ${user.role}`}
-                                    />
-                                    <ListItemSecondaryAction>
-                                        <IconButton edge="end" size="small">
-                                            <Edit />
-                                        </IconButton>
-                                        <IconButton edge="end" size="small">
-                                            <Delete />
-                                        </IconButton>
-                                    </ListItemSecondaryAction>
-                                </ListItem>
-                            ))}
-                        </List>
-                    </Paper>
-                </Grid>
-            </Grid>
+                <TabPanel value={value} index={0}>
+                    <ClassSettings />
+                </TabPanel>
+                <TabPanel value={value} index={1}>
+                    <StaffSettings />
+                </TabPanel>
+                <TabPanel value={value} index={2}>
+                    <OrganizationSettings />
+                </TabPanel>
+                <TabPanel value={value} index={3}>
+                    <EmailSettings />
+                </TabPanel>
+            </Paper>
         </Box>
     );
-});
+};
 
 export default Settings;

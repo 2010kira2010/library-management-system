@@ -27,6 +27,10 @@ import { useRootStore } from '../stores/RootStore';
 import BarcodeScanner from '../components/Common/BarcodeScanner';
 import ConfirmDialog from '../components/Common/ConfirmDialog';
 import ReaderDialog from '../components/Readers/ReaderDialog';
+import ExportDialog from '../components/Common/ExportDialog';
+import { exportReadersToExcel } from '../utils/excelUtils';
+import ImportDialog from '../components/Common/ImportDialog';
+import { importFromExcel } from '../utils/excelUtils';
 
 const Readers: React.FC = observer(() => {
     const { readerStore, uiStore } = useRootStore();
@@ -36,6 +40,8 @@ const Readers: React.FC = observer(() => {
     const [openScanner, setOpenScanner] = useState(false);
     const [openConfirm, setOpenConfirm] = useState(false);
     const [readerToDelete, setReaderToDelete] = useState<any>(null);
+    const [exportDialogOpen, setExportDialogOpen] = useState(false);
+    const [importDialogOpen, setImportDialogOpen] = useState(false);
 
     useEffect(() => {
         readerStore.loadReaders();
@@ -132,12 +138,45 @@ const Readers: React.FC = observer(() => {
         uiStore.showNotification('Печать штрих-кодов в разработке', 'info');
     };
 
-    const handleImport = () => {
-        uiStore.showNotification('Импорт из Excel в разработке', 'info');
+    const handleImport = async (file: File) => {
+        const data = await importFromExcel({
+            file,
+            headers: {
+                code: 'Код',
+                title: 'Название',
+                // ... маппинг полей
+            }
+        });
+
+        // Обработка импортированных данных
+        let success = 0;
+        let failed = 0;
+        const errors = [];
+
+        for (const item of data) {
+            try {
+                await readerStore.createReader(item);
+                success++;
+            } catch (error) {
+                failed++;
+                errors.push({ row: data.indexOf(item) + 2, error: error.message });
+            }
+        }
+
+        return { success, failed, errors };
     };
 
-    const handleExport = () => {
-        readerStore.exportToExcel();
+    const handleExport = async (selectedFields: string[]) => {
+        // Фильтруем данные по выбранным полям
+        const exportData = readerStore.readers.map(reader => {
+            const filtered: any = {};
+            selectedFields.forEach(field => {
+                filtered[field] = reader[field];
+            });
+            return filtered;
+        });
+
+        exportReadersToExcel(exportData);
     };
 
     const handleSearch = (query: string) => {
@@ -185,6 +224,13 @@ const Readers: React.FC = observer(() => {
                     >
                         Импорт из Excel
                     </Button>
+                    <ImportDialog
+                        open={importDialogOpen}
+                        onClose={() => setImportDialogOpen(false)}
+                        title="Импорт читателей"
+                        templateUrl="/templates/readers_template.xlsx"
+                        onImport={handleImport}
+                    />
                     <Button
                         variant="outlined"
                         startIcon={<FileDownload />}
@@ -192,6 +238,18 @@ const Readers: React.FC = observer(() => {
                     >
                         Экспорт в Excel
                     </Button>
+                    <ExportDialog
+                        open={exportDialogOpen}
+                        onClose={() => setExportDialogOpen(false)}
+                        title="Экспорт читателей"
+                        fields={[
+                            { key: 'code', label: 'Код', selected: true },
+                            { key: 'title', label: 'Название', selected: true },
+                            { key: 'author', label: 'Автор', selected: true },
+                            // ... другие поля
+                        ]}
+                        onExport={handleExport}
+                    />
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>

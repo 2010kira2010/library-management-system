@@ -8,9 +8,7 @@ import {
     Card,
     CardContent,
     Button,
-    TextField,
     Alert,
-    Divider,
     List,
     ListItem,
     ListItemText,
@@ -23,13 +21,15 @@ import {
     Person,
     Book,
     CheckCircle,
-    Error,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useRootStore } from '../stores/RootStore';
 import BarcodeScanner from '../components/Common/BarcodeScanner';
 import api from '../services/api';
+//import ExportDialog from '../components/Common/ExportDialog';
+//import { exportLoansToExcel } from '../utils/excelUtils';
+//import loanStore from "../stores/LoanStore";
 
 const Loans: React.FC = observer(() => {
     const { uiStore } = useRootStore();
@@ -38,6 +38,7 @@ const Loans: React.FC = observer(() => {
     const [bookData, setBookData] = useState<any>(null);
     const [issuedBooks, setIssuedBooks] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    //const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
     const handleScanReader = async (barcode: string) => {
         try {
@@ -102,6 +103,7 @@ const Loans: React.FC = observer(() => {
         setBookData(null);
         setIssuedBooks([]);
     };
+
 
     return (
         <Box>

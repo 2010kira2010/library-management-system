@@ -6,9 +6,11 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ruRU } from '@mui/material/locale';
 import { observer } from 'mobx-react-lite';
 import CssBaseline from '@mui/material/CssBaseline';
+import ruLocale from 'date-fns/locale/ru';
 
 import { useRootStore } from './stores/RootStore';
 import Layout from './components/Layout/Layout';
+import LoadingOverlay from './components/Common/LoadingOverlay';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Books from './pages/Books';
@@ -20,6 +22,7 @@ import Publishers from './pages/Publishers';
 import Disks from './pages/Disks';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import EmailClient from './pages/EmailClient';
 
 // Тема Material-UI
 const theme = createTheme({
@@ -34,6 +37,33 @@ const theme = createTheme({
             default: '#f5f5f5',
         },
     },
+    typography: {
+        fontFamily: [
+            'Roboto',
+            '-apple-system',
+            'BlinkMacSystemFont',
+            '"Segoe UI"',
+            '"Helvetica Neue"',
+            'Arial',
+            'sans-serif',
+        ].join(','),
+    },
+    components: {
+        MuiButton: {
+            styleOverrides: {
+                root: {
+                    textTransform: 'none',
+                },
+            },
+        },
+        MuiTableCell: {
+            styleOverrides: {
+                root: {
+                    padding: '12px 16px',
+                },
+            },
+        },
+    },
 }, ruRU);
 
 const App: React.FC = observer(() => {
@@ -41,7 +71,7 @@ const App: React.FC = observer(() => {
 
     return (
         <ThemeProvider theme={theme}>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
+            <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ruLocale}>
                 <CssBaseline />
                 <Router>
                     <Routes>
@@ -60,9 +90,11 @@ const App: React.FC = observer(() => {
                             <Route path="disks" element={<Disks />} />
                             <Route path="reports" element={<Reports />} />
                             <Route path="settings" element={<Settings />} />
+                            <Route path="email" element={<EmailClient />} />
                         </Route>
                     </Routes>
                 </Router>
+                <LoadingOverlay />
             </LocalizationProvider>
         </ThemeProvider>
     );

@@ -9,6 +9,7 @@ import AuthorStore from './AuthorStore';
 import PublisherStore from './PublisherStore';
 import DiskStore from './DiskStore';
 import SettingsStore from './SettingsStore';
+import api from '../services/api';
 
 class RootStore {
     authStore: AuthStore;
@@ -20,6 +21,7 @@ class RootStore {
     publisherStore: PublisherStore;
     diskStore: DiskStore;
     settingsStore: SettingsStore;
+    apiClient: typeof api;
 
     constructor() {
         this.authStore = new AuthStore(this);
@@ -31,6 +33,7 @@ class RootStore {
         this.publisherStore = new PublisherStore(this);
         this.diskStore = new DiskStore(this);
         this.settingsStore = new SettingsStore(this);
+        this.apiClient = api;
         makeAutoObservable(this);
     }
 }

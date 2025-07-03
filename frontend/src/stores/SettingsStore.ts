@@ -32,6 +32,11 @@ class SettingsStore {
     isLoading = false;
     error: string | null = null;
 
+    // API клиент для прямых запросов
+    get apiClient() {
+        return this.rootStore.apiClient || api;
+    }
+
     // Типы документов
     documentTypes = [
         'Паспорт',
