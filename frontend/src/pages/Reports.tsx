@@ -138,7 +138,7 @@ const Reports: React.FC = () => {
                                             value={selectedClass}
                                             onChange={(e) => setSelectedClass(e.target.value)}
                                         >
-                                            {settingsStore.classes.map((cls) => (
+                                            {(settingsStore.classes || []).map((cls) => (
                                                 <MenuItem key={cls.id} value={cls.id}>
                                                     {cls.grade} "{cls.letter}"
                                                 </MenuItem>

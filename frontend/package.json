@@ -19,6 +19,7 @@
     "@mui/x-data-grid": "^5.17.24",
     "@mui/x-date-pickers": "^5.0.16",
     "axios": "^1.6.5",
+    "browser": "^0.2.6",
     "date-fns": "^2.29.3",
     "dayjs": "^1.11.13",
     "jsbarcode": "^3.12.1",

@@ -313,7 +313,7 @@ const ReaderDialog: React.FC<ReaderDialogProps> = observer(({
                                 <MenuItem value="">
                                     <em>Не указан</em>
                                 </MenuItem>
-                                {settingsStore.classes.map((cls) => (
+                                {(settingsStore.classes || []).map((cls) => (
                                     <MenuItem key={cls.id} value={cls.id}>
                                         {cls.grade} "{cls.letter}"
                                     </MenuItem>

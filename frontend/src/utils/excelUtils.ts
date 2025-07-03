@@ -107,7 +107,7 @@ export const importFromExcel = async (options: ImportOptions): Promise<any[]> =>
 // Генерация шаблона для импорта
 export const generateImportTemplate = (fileName: string, headers: Record<string, string>) => {
     // Создаем пустую строку с заголовками
-    const templateData = [{}];
+    const templateData: Record<string, any>[] = [{}];
     Object.values(headers).forEach(header => {
         templateData[0][header] = '';
     });

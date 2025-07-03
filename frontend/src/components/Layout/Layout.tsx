@@ -91,6 +91,15 @@ const Layout: React.FC = observer(() => {
         navigate('/login');
     };
 
+    const handleEmailClick = () => {
+        navigate('/email');
+    };
+
+    const handleCalendarClick = () => {
+        // TODO: Implement calendar functionality
+        uiStore.showNotification('Календарь в разработке', 'info');
+    };
+
     const drawer = (
         <div>
             <Toolbar>
@@ -152,11 +161,19 @@ const Layout: React.FC = observer(() => {
                         </Badge>
                     </IconButton>
 
-                    <IconButton color="inherit" sx={{ mr: 1 }}>
+                    <IconButton
+                        color="inherit"
+                        sx={{ mr: 1 }}
+                        onClick={handleCalendarClick}
+                    >
                         <CalendarMonth />
                     </IconButton>
 
-                    <IconButton color="inherit" sx={{ mr: 2 }} onClick={() => navigate('/email')}>
+                    <IconButton
+                        color="inherit"
+                        sx={{ mr: 2 }}
+                        onClick={handleEmailClick}
+                    >
                         <Mail />
                     </IconButton>
 

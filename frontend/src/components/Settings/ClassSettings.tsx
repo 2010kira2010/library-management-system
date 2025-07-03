@@ -210,7 +210,7 @@ const ClassSettings: React.FC = observer(() => {
                                         <IconButton
                                             size="small"
                                             onClick={() => handleDelete(classItem.id)}
-                                            disabled={classItem.students_count && classItem.students_count > 0}
+                                            disabled={!!classItem.students_count && classItem.students_count > 0}
                                         >
                                             <Delete />
                                         </IconButton>

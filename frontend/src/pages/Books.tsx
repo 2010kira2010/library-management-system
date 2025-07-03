@@ -27,19 +27,22 @@ import BarcodeScanner from '../components/Common/BarcodeScanner';
 import ConfirmDialog from '../components/Common/ConfirmDialog';
 import ExportDialog from '../components/Common/ExportDialog';
 import ImportDialog from '../components/Common/ImportDialog';
-import { exportBooksToExcel } from '../utils/excelUtils';
-import { importFromExcel } from '../utils/excelUtils';
+import BarcodePrintDialog from '../components/Common/BarcodePrintDialog';
+import { exportBooksToExcel, importFromExcel } from '../utils/excelUtils';
+import { Book } from '../stores/BookStore';
 
 const Books: React.FC = observer(() => {
     const { bookStore, uiStore } = useRootStore();
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedBook, setSelectedBook] = useState(null);
+    const [selectedBook, setSelectedBook] = useState<Book | null>(null);
     const [openDialog, setOpenDialog] = useState(false);
     const [openScanner, setOpenScanner] = useState(false);
     const [openConfirm, setOpenConfirm] = useState(false);
-    const [bookToDelete, setBookToDelete] = useState(null);
-    const [exportDialogOpen, setExportDialogOpen] = useState(false);
-    const [importDialogOpen, setImportDialogOpen] = useState(false);
+    const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
+    const [openExport, setOpenExport] = useState(false);
+    const [openImport, setOpenImport] = useState(false);
+    const [openPrint, setOpenPrint] = useState(false);
+    const [selectedRows, setSelectedRows] = useState<number[]>([]);
 
     useEffect(() => {
         bookStore.loadBooks();
@@ -102,12 +105,12 @@ const Books: React.FC = observer(() => {
         setOpenDialog(true);
     };
 
-    const handleEdit = (book: any) => {
+    const handleEdit = (book: Book) => {
         setSelectedBook(book);
         setOpenDialog(true);
     };
 
-    const handleDelete = (book: any) => {
+    const handleDelete = (book: Book) => {
         setBookToDelete(book);
         setOpenConfirm(true);
     };
@@ -127,51 +130,76 @@ const Books: React.FC = observer(() => {
     };
 
     const handlePrintBarcodes = () => {
-        // Implement barcode printing
-        uiStore.showNotification('Печать штрих-кодов в разработке', 'info');
+        const selectedBooks = bookStore.filteredBooks.filter(book =>
+            selectedRows.includes(book.id)
+        );
+
+        if (selectedBooks.length === 0) {
+            uiStore.showNotification('Выберите книги для печати штрих-кодов', 'warning');
+            return;
+        }
+
+        setOpenPrint(true);
     };
 
     const handleImport = async (file: File) => {
-        const data = await importFromExcel({
-            file,
-            headers: {
-                code: 'Код',
-                title: 'Название',
-                // ... маппинг полей
-            }
-        });
+        try {
+            const data = await importFromExcel({
+                file,
+                headers: {
+                    code: 'Код',
+                    title: 'Наименование',
+                    barcode: 'Штрих-код',
+                    isbn: 'ISBN',
+                    publication_year: 'Год издания',
+                    class_range: 'Класс',
+                    location: 'Место размещения',
+                    bbk: 'ББК',
+                    udk: 'УДК',
+                }
+            });
 
-        // Обработка импортированных данных
-        let success = 0;
-        let failed = 0;
-        const errors = [];
+            let success = 0;
+            let failed = 0;
+            const errors: Array<{ row: number; error: string }> = [];
 
-        for (const item of data) {
-            try {
-                await bookStore.createBook(item);
-                success++;
-            } catch (error) {
-                failed++;
-                errors.push({ row: data.indexOf(item) + 2, error: error.message });
+            for (const item of data) {
+                try {
+                    await bookStore.createBook(item);
+                    success++;
+                } catch (error: any) {
+                    failed++;
+                    errors.push({
+                        row: data.indexOf(item) + 2,
+                        error: error.message || 'Неизвестная ошибка'
+                    });
+                }
             }
+
+            return { success, failed, errors };
+        } catch (error: any) {
+            throw new Error(error.message || 'Ошибка импорта');
         }
-
-        return { success, failed, errors };
     };
 
     const handleExport = async (selectedFields: string[]) => {
-        // Фильтруем данные по выбранным полям
-        const exportData = bookStore.books.map(book => {
-            const filtered: any = {};
+        const exportData = bookStore.filteredBooks.map(book => {
+            const filtered: Record<string, any> = {};
             selectedFields.forEach(field => {
-                filtered[field] = book[field];
+                // Обработка вложенных полей
+                if (field.includes('.')) {
+                    const [parent, child] = field.split('.');
+                    filtered[field] = (book as any)[parent]?.[child] || '';
+                } else {
+                    filtered[field] = (book as any)[field] || '';
+                }
             });
             return filtered;
         });
 
         exportBooksToExcel(exportData);
+        uiStore.showNotification('Экспорт завершен', 'success');
     };
-
 
     return (
         <Box>
@@ -192,42 +220,24 @@ const Books: React.FC = observer(() => {
                         variant="outlined"
                         startIcon={<Print />}
                         onClick={handlePrintBarcodes}
+                        disabled={selectedRows.length === 0}
                     >
-                        Печать штрих кода
+                        Печать штрих кода ({selectedRows.length})
                     </Button>
                     <Button
                         variant="outlined"
                         startIcon={<FileUpload />}
-                        onClick={handleImport}
+                        onClick={() => setOpenImport(true)}
                     >
                         Импорт из Excel
                     </Button>
-                    <ImportDialog
-                        open={importDialogOpen}
-                        onClose={() => setImportDialogOpen(false)}
-                        title="Импорт книг"
-                        templateUrl="/templates/books_template.xlsx"
-                        onImport={handleImport}
-                    />
                     <Button
                         variant="outlined"
                         startIcon={<FileDownload />}
-                        onClick={handleExport}
+                        onClick={() => setOpenExport(true)}
                     >
                         Экспорт в Excel
                     </Button>
-                    <ExportDialog
-                        open={exportDialogOpen}
-                        onClose={() => setExportDialogOpen(false)}
-                        title="Экспорт книг"
-                        fields={[
-                            { key: 'code', label: 'Код', selected: true },
-                            { key: 'title', label: 'Название', selected: true },
-                            { key: 'author', label: 'Автор', selected: true },
-                            // ... другие поля
-                        ]}
-                        onExport={handleExport}
-                    />
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
@@ -268,6 +278,9 @@ const Books: React.FC = observer(() => {
                     disableSelectionOnClick
                     autoHeight
                     loading={bookStore.isLoading}
+                    onRowSelectionModelChange={(newSelection) => {
+                        setSelectedRows(newSelection as number[]);
+                    }}
                     components={{
                         Toolbar: GridToolbar,
                     }}
@@ -303,6 +316,7 @@ const Books: React.FC = observer(() => {
                 open={openScanner}
                 onClose={() => setOpenScanner(false)}
                 onScan={handleScanBarcode}
+                title="Сканирование штрих-кода книги"
             />
 
             <ConfirmDialog
@@ -310,7 +324,52 @@ const Books: React.FC = observer(() => {
                 title="Удалить книгу?"
                 message={`Вы уверены, что хотите удалить книгу "${bookToDelete?.title}"?`}
                 onConfirm={confirmDelete}
-                onCancel={() => setOpenConfirm(false)}
+                onCancel={() => {
+                    setOpenConfirm(false);
+                    setBookToDelete(null);
+                }}
+            />
+
+            <ExportDialog
+                open={openExport}
+                onClose={() => setOpenExport(false)}
+                title="Экспорт книг в Excel"
+                fields={[
+                    { key: 'code', label: 'Код', selected: true },
+                    { key: 'title', label: 'Наименование', selected: true },
+                    { key: 'author.short_name', label: 'Автор', selected: true },
+                    { key: 'publisher.name', label: 'Издательство', selected: true },
+                    { key: 'publication_year', label: 'Год издания', selected: true },
+                    { key: 'barcode', label: 'Штрих-код', selected: true },
+                    { key: 'isbn', label: 'ISBN', selected: true },
+                    { key: 'bbk', label: 'ББК', selected: false },
+                    { key: 'udk', label: 'УДК', selected: false },
+                    { key: 'class_range', label: 'Класс', selected: true },
+                    { key: 'location', label: 'Место размещения', selected: true },
+                    { key: 'is_available', label: 'Доступна', selected: true },
+                ]}
+                onExport={handleExport}
+            />
+
+            <ImportDialog
+                open={openImport}
+                onClose={() => setOpenImport(false)}
+                title="Импорт книг из Excel"
+                templateUrl="/templates/books_template.xlsx"
+                onImport={handleImport}
+            />
+
+            <BarcodePrintDialog
+                open={openPrint}
+                onClose={() => setOpenPrint(false)}
+                items={bookStore.filteredBooks
+                    .filter(book => selectedRows.includes(book.id))
+                    .map(book => ({
+                        id: book.id,
+                        title: book.title,
+                        barcode: book.barcode,
+                        author: book.author?.short_name
+                    }))}
             />
         </Box>
     );

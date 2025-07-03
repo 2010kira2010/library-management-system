@@ -28,20 +28,24 @@ import BarcodeScanner from '../components/Common/BarcodeScanner';
 import ConfirmDialog from '../components/Common/ConfirmDialog';
 import ReaderDialog from '../components/Readers/ReaderDialog';
 import ExportDialog from '../components/Common/ExportDialog';
-import { exportReadersToExcel } from '../utils/excelUtils';
 import ImportDialog from '../components/Common/ImportDialog';
-import { importFromExcel } from '../utils/excelUtils';
+import BarcodePrintDialog from '../components/Common/BarcodePrintDialog';
+import { exportReadersToExcel, importFromExcel } from '../utils/excelUtils';
+import { Reader } from '../stores/ReaderStore';
 
 const Readers: React.FC = observer(() => {
     const { readerStore, uiStore } = useRootStore();
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedReader, setSelectedReader] = useState<any>(null);
+    const [selectedReader, setSelectedReader] = useState<Reader | null>(null);
     const [openDialog, setOpenDialog] = useState(false);
     const [openScanner, setOpenScanner] = useState(false);
     const [openConfirm, setOpenConfirm] = useState(false);
-    const [readerToDelete, setReaderToDelete] = useState<any>(null);
-    const [exportDialogOpen, setExportDialogOpen] = useState(false);
-    const [importDialogOpen, setImportDialogOpen] = useState(false);
+    const [readerToDelete, setReaderToDelete] = useState<Reader | null>(null);
+    const [openExport, setOpenExport] = useState(false);
+    const [openImport, setOpenImport] = useState(false);
+    const [openPrint, setOpenPrint] = useState(false);
+    const [openPrintCards, setOpenPrintCards] = useState(false);
+    const [selectedRows, setSelectedRows] = useState<number[]>([]);
 
     useEffect(() => {
         readerStore.loadReaders();
@@ -54,7 +58,7 @@ const Readers: React.FC = observer(() => {
             headerName: 'ФИО',
             flex: 1,
             valueGetter: (params) =>
-                `${params.row.last_name} ${params.row.first_name} ${params.row.middle_name}`.trim()
+                `${params.row.last_name} ${params.row.first_name} ${params.row.middle_name || ''}`.trim()
         },
         { field: 'user_type', headerName: 'Тип', width: 120 },
         { field: 'grade', headerName: 'Класс', width: 80 },
@@ -67,7 +71,7 @@ const Readers: React.FC = observer(() => {
             width: 120,
             renderCell: (params) => (
                 <Chip
-                    label={params.value}
+                    label={params.value || 0}
                     color={params.value > 0 ? 'primary' : 'default'}
                     size="small"
                 />
@@ -112,12 +116,12 @@ const Readers: React.FC = observer(() => {
         setOpenDialog(true);
     };
 
-    const handleEdit = (reader: any) => {
+    const handleEdit = (reader: Reader) => {
         setSelectedReader(reader);
         setOpenDialog(true);
     };
 
-    const handleDelete = (reader: any) => {
+    const handleDelete = (reader: Reader) => {
         setReaderToDelete(reader);
         setOpenConfirm(true);
     };
@@ -130,53 +134,95 @@ const Readers: React.FC = observer(() => {
         }
     };
 
-    const handlePrintCard = (reader: any) => {
-        readerStore.printReaderCard(reader.id);
+    const handlePrintCard = (reader: Reader) => {
+        setSelectedRows([reader.id]);
+        setOpenPrintCards(true);
     };
 
     const handlePrintBarcodes = () => {
-        uiStore.showNotification('Печать штрих-кодов в разработке', 'info');
+        const selectedReaders = readerStore.filteredReaders.filter(reader =>
+            selectedRows.includes(reader.id)
+        );
+
+        if (selectedReaders.length === 0) {
+            uiStore.showNotification('Выберите читателей для печати штрих-кодов', 'warning');
+            return;
+        }
+
+        setOpenPrint(true);
+    };
+
+    const handlePrintCards = () => {
+        const selectedReaders = readerStore.filteredReaders.filter(reader =>
+            selectedRows.includes(reader.id)
+        );
+
+        if (selectedReaders.length === 0) {
+            uiStore.showNotification('Выберите читателей для печати билетов', 'warning');
+            return;
+        }
+
+        setOpenPrintCards(true);
     };
 
     const handleImport = async (file: File) => {
-        const data = await importFromExcel({
-            file,
-            headers: {
-                code: 'Код',
-                title: 'Название',
-                // ... маппинг полей
-            }
-        });
+        try {
+            const data = await importFromExcel({
+                file,
+                headers: {
+                    code: 'Код',
+                    barcode: 'Штрих-код',
+                    last_name: 'Фамилия',
+                    first_name: 'Имя',
+                    middle_name: 'Отчество',
+                    user_type: 'Тип',
+                    grade: 'Класс',
+                    gender: 'Пол',
+                    birth_date: 'Дата рождения',
+                    address: 'Адрес',
+                    phone: 'Телефон',
+                    email: 'Email',
+                    parent_mother_name: 'ФИО матери',
+                    parent_mother_phone: 'Телефон матери',
+                    parent_father_name: 'ФИО отца',
+                    parent_father_phone: 'Телефон отца',
+                }
+            });
 
-        // Обработка импортированных данных
-        let success = 0;
-        let failed = 0;
-        const errors = [];
+            let success = 0;
+            let failed = 0;
+            const errors: Array<{ row: number; error: string }> = [];
 
-        for (const item of data) {
-            try {
-                await readerStore.createReader(item);
-                success++;
-            } catch (error) {
-                failed++;
-                errors.push({ row: data.indexOf(item) + 2, error: error.message });
+            for (const item of data) {
+                try {
+                    await readerStore.createReader(item);
+                    success++;
+                } catch (error: any) {
+                    failed++;
+                    errors.push({
+                        row: data.indexOf(item) + 2,
+                        error: error.message || 'Неизвестная ошибка'
+                    });
+                }
             }
+
+            return { success, failed, errors };
+        } catch (error: any) {
+            throw new Error(error.message || 'Ошибка импорта');
         }
-
-        return { success, failed, errors };
     };
 
     const handleExport = async (selectedFields: string[]) => {
-        // Фильтруем данные по выбранным полям
-        const exportData = readerStore.readers.map(reader => {
-            const filtered: any = {};
+        const exportData = readerStore.filteredReaders.map(reader => {
+            const filtered: Record<string, any> = {};
             selectedFields.forEach(field => {
-                filtered[field] = reader[field];
+                filtered[field] = (reader as any)[field] || '';
             });
             return filtered;
         });
 
         exportReadersToExcel(exportData);
+        uiStore.showNotification('Экспорт завершен', 'success');
     };
 
     const handleSearch = (query: string) => {
@@ -208,48 +254,32 @@ const Readers: React.FC = observer(() => {
                         variant="outlined"
                         startIcon={<Print />}
                         onClick={handlePrintBarcodes}
+                        disabled={selectedRows.length === 0}
                     >
-                        Печать штрих кода
+                        Печать штрих кода ({selectedRows.length})
                     </Button>
                     <Button
                         variant="outlined"
                         startIcon={<CreditCard />}
+                        onClick={handlePrintCards}
+                        disabled={selectedRows.length === 0}
                     >
-                        Печать читательских билетов
+                        Печать читательских билетов ({selectedRows.length})
                     </Button>
                     <Button
                         variant="outlined"
                         startIcon={<FileUpload />}
-                        onClick={handleImport}
+                        onClick={() => setOpenImport(true)}
                     >
                         Импорт из Excel
                     </Button>
-                    <ImportDialog
-                        open={importDialogOpen}
-                        onClose={() => setImportDialogOpen(false)}
-                        title="Импорт читателей"
-                        templateUrl="/templates/readers_template.xlsx"
-                        onImport={handleImport}
-                    />
                     <Button
                         variant="outlined"
                         startIcon={<FileDownload />}
-                        onClick={handleExport}
+                        onClick={() => setOpenExport(true)}
                     >
                         Экспорт в Excel
                     </Button>
-                    <ExportDialog
-                        open={exportDialogOpen}
-                        onClose={() => setExportDialogOpen(false)}
-                        title="Экспорт читателей"
-                        fields={[
-                            { key: 'code', label: 'Код', selected: true },
-                            { key: 'title', label: 'Название', selected: true },
-                            { key: 'author', label: 'Автор', selected: true },
-                            // ... другие поля
-                        ]}
-                        onExport={handleExport}
-                    />
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
@@ -281,16 +311,15 @@ const Readers: React.FC = observer(() => {
                 <DataGrid
                     rows={readerStore.filteredReaders}
                     columns={columns}
-                    initialState={{
-                        pagination: {
-                            paginationModel: { pageSize: 10, page: 0 },
-                        },
-                    }}
-                    pageSizeOptions={[10, 25, 50]}
+                    pageSize={10}
+                    rowsPerPageOptions={[10, 25, 50]}
                     checkboxSelection
                     disableRowSelectionOnClick
                     autoHeight
                     loading={readerStore.isLoading}
+                    onRowSelectionModelChange={(newSelection) => {
+                        setSelectedRows(newSelection as number[]);
+                    }}
                     slots={{
                         toolbar: GridToolbar,
                     }}
@@ -326,6 +355,7 @@ const Readers: React.FC = observer(() => {
                 open={openScanner}
                 onClose={() => setOpenScanner(false)}
                 onScan={handleScanBarcode}
+                title="Сканирование штрих-кода читателя"
             />
 
             <ConfirmDialog
@@ -337,6 +367,67 @@ const Readers: React.FC = observer(() => {
                     setOpenConfirm(false);
                     setReaderToDelete(null);
                 }}
+            />
+
+            <ExportDialog
+                open={openExport}
+                onClose={() => setOpenExport(false)}
+                title="Экспорт читателей в Excel"
+                fields={[
+                    { key: 'code', label: 'Код', selected: true },
+                    { key: 'barcode', label: 'Штрих-код', selected: true },
+                    { key: 'last_name', label: 'Фамилия', selected: true },
+                    { key: 'first_name', label: 'Имя', selected: true },
+                    { key: 'middle_name', label: 'Отчество', selected: true },
+                    { key: 'user_type', label: 'Тип', selected: true },
+                    { key: 'grade', label: 'Класс', selected: true },
+                    { key: 'gender', label: 'Пол', selected: false },
+                    { key: 'birth_date', label: 'Дата рождения', selected: false },
+                    { key: 'address', label: 'Адрес', selected: false },
+                    { key: 'phone', label: 'Телефон', selected: true },
+                    { key: 'email', label: 'Email', selected: true },
+                    { key: 'parent_mother_name', label: 'ФИО матери', selected: false },
+                    { key: 'parent_mother_phone', label: 'Телефон матери', selected: false },
+                    { key: 'parent_father_name', label: 'ФИО отца', selected: false },
+                    { key: 'parent_father_phone', label: 'Телефон отца', selected: false },
+                    { key: 'active_loans_count', label: 'Книг на руках', selected: true },
+                ]}
+                onExport={handleExport}
+            />
+
+            <ImportDialog
+                open={openImport}
+                onClose={() => setOpenImport(false)}
+                title="Импорт читателей из Excel"
+                templateUrl="/templates/readers_template.xlsx"
+                onImport={handleImport}
+            />
+
+            <BarcodePrintDialog
+                open={openPrint}
+                onClose={() => setOpenPrint(false)}
+                items={readerStore.filteredReaders
+                    .filter(reader => selectedRows.includes(reader.id))
+                    .map(reader => ({
+                        id: reader.id,
+                        title: `${reader.last_name} ${reader.first_name}`,
+                        barcode: reader.barcode,
+                        author: `Класс: ${reader.grade || '-'}`
+                    }))}
+            />
+
+            {/* Диалог печати читательских билетов */}
+            <BarcodePrintDialog
+                open={openPrintCards}
+                onClose={() => setOpenPrintCards(false)}
+                items={readerStore.filteredReaders
+                    .filter(reader => selectedRows.includes(reader.id))
+                    .map(reader => ({
+                        id: reader.id,
+                        title: `Читательский билет`,
+                        barcode: reader.barcode,
+                        author: `${reader.last_name} ${reader.first_name} ${reader.middle_name || ''}\nКласс: ${reader.grade || '-'}`
+                    }))}
             />
         </Box>
     );

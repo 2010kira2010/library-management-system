@@ -204,8 +204,8 @@ class ApiService {
     }
 
     // Utility methods
-    post(url: string, data?: any) {
-        return this.api.post(url, data);
+    post(url: string, data?: any, config?: any) {
+        return this.api.post(url, data, config);
     }
 
     get(url: string, params?: any) {
@@ -214,6 +214,10 @@ class ApiService {
 
     put(url: string, data?: any) {
         return this.api.put(url, data);
+    }
+
+    patch(url: string, data?: any) {
+        return this.api.patch(url, data);
     }
 
     delete(url: string) {
