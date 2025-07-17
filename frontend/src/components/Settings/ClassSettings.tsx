@@ -19,6 +19,7 @@ import {
     Paper,
     Chip,
     Alert,
+    CircularProgress,
 } from '@mui/material';
 import {
     Add,
@@ -28,54 +29,43 @@ import {
     Cancel,
 } from '@mui/icons-material';
 import { useRootStore } from '../../stores/RootStore';
-
-interface ClassItem {
-    id: number;
-    name: string;
-    description?: string;
-    students_count?: number;
-    is_active: boolean;
-}
+import { Class } from '../../stores/SettingsStore';
 
 const ClassSettings: React.FC = observer(() => {
-    const { apiClient, uiStore } = useRootStore();
-    const [classes, setClasses] = useState<ClassItem[]>([]);
+    const { settingsStore } = useRootStore();
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingClass, setEditingClass] = useState<ClassItem | null>(null);
+    const [editingClass, setEditingClass] = useState<Class | null>(null);
     const [formData, setFormData] = useState({
-        name: '',
-        description: '',
+        grade: '',
+        letter: '',
+        teacher_name: '',
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         loadClasses();
     }, []);
 
     const loadClasses = async () => {
-        try {
-            uiStore.setLoading(true);
-            const response = await apiClient.get('/api/settings/classes');
-            setClasses(response.data || []);
-        } catch (error: any) {
-            uiStore.showNotification('Ошибка загрузки классов', 'error');
-        } finally {
-            uiStore.setLoading(false);
-        }
+        setLoading(true);
+        await settingsStore.loadClasses();
+        setLoading(false);
     };
 
     const handleAdd = () => {
         setEditingClass(null);
-        setFormData({ name: '', description: '' });
+        setFormData({ grade: '', letter: '', teacher_name: '' });
         setErrors({});
         setDialogOpen(true);
     };
 
-    const handleEdit = (classItem: ClassItem) => {
+    const handleEdit = (classItem: Class) => {
         setEditingClass(classItem);
         setFormData({
-            name: classItem.name,
-            description: classItem.description || '',
+            grade: classItem.grade.toString(),
+            letter: classItem.letter,
+            teacher_name: classItem.teacher_name || '',
         });
         setErrors({});
         setDialogOpen(true);
@@ -86,20 +76,20 @@ const ClassSettings: React.FC = observer(() => {
             return;
         }
 
-        try {
-            await apiClient.delete(`/api/settings/classes/${id}`);
-            uiStore.showNotification('Класс успешно удален', 'success');
-            loadClasses();
-        } catch (error: any) {
-            uiStore.showNotification(error.response?.data?.error || 'Ошибка удаления класса', 'error');
-        }
+        await settingsStore.deleteClass(id);
     };
 
     const validate = (): boolean => {
         const newErrors: Record<string, string> = {};
 
-        if (!formData.name.trim()) {
-            newErrors.name = 'Название класса обязательно';
+        if (!formData.grade) {
+            newErrors.grade = 'Класс обязателен';
+        } else if (parseInt(formData.grade) < 1 || parseInt(formData.grade) > 11) {
+            newErrors.grade = 'Класс должен быть от 1 до 11';
+        }
+
+        if (!formData.letter.trim()) {
+            newErrors.letter = 'Литера обязательна';
         }
 
         setErrors(newErrors);
@@ -109,36 +99,32 @@ const ClassSettings: React.FC = observer(() => {
     const handleSave = async () => {
         if (!validate()) return;
 
-        try {
-            uiStore.setLoading(true);
-            if (editingClass) {
-                await apiClient.put(`/api/settings/classes/${editingClass.id}`, formData);
-                uiStore.showNotification('Класс успешно обновлен', 'success');
-            } else {
-                await apiClient.post('/api/settings/classes', formData);
-                uiStore.showNotification('Класс успешно добавлен', 'success');
-            }
+        const classData = {
+            grade: parseInt(formData.grade),
+            letter: formData.letter.trim(),
+            teacher_name: formData.teacher_name.trim(),
+        };
+
+        const success = editingClass
+            ? await settingsStore.updateClass(editingClass.id, classData)
+            : await settingsStore.createClass(classData);
+
+        if (success) {
             setDialogOpen(false);
-            loadClasses();
-        } catch (error: any) {
-            uiStore.showNotification(error.response?.data?.error || 'Ошибка сохранения класса', 'error');
-        } finally {
-            uiStore.setLoading(false);
         }
     };
 
-    const toggleActive = async (classItem: ClassItem) => {
-        try {
-            await apiClient.patch(`/api/settings/classes/${classItem.id}/toggle-active`);
-            uiStore.showNotification(
-                classItem.is_active ? 'Класс деактивирован' : 'Класс активирован',
-                'success'
-            );
-            loadClasses();
-        } catch (error: any) {
-            uiStore.showNotification('Ошибка изменения статуса класса', 'error');
-        }
+    const toggleActive = async (classItem: Class) => {
+        await settingsStore.toggleClassActive(classItem.id);
     };
+
+    if (loading) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+                <CircularProgress />
+            </Box>
+        );
+    }
 
     return (
         <Box>
@@ -162,40 +148,44 @@ const ClassSettings: React.FC = observer(() => {
                 <Table>
                     <TableHead>
                         <TableRow>
-                            <TableCell>Название</TableCell>
-                            <TableCell>Описание</TableCell>
+                            <TableCell>Класс</TableCell>
+                            <TableCell>Литера</TableCell>
+                            <TableCell>Классный руководитель</TableCell>
                             <TableCell align="center">Учеников</TableCell>
                             <TableCell align="center">Статус</TableCell>
                             <TableCell align="right">Действия</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {classes.length === 0 ? (
+                        {settingsStore.classes.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} align="center">
+                                <TableCell colSpan={6} align="center">
                                     <Typography variant="body2" color="text.secondary">
                                         Классы не найдены
                                     </Typography>
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            classes.map((classItem) => (
+                            settingsStore.classes.map((classItem) => (
                                 <TableRow key={classItem.id}>
                                     <TableCell>
                                         <Typography variant="subtitle2">
-                                            {classItem.name}
+                                            {classItem.grade}
                                         </Typography>
                                     </TableCell>
                                     <TableCell>
-                                        {classItem.description || '—'}
+                                        "{classItem.letter}"
+                                    </TableCell>
+                                    <TableCell>
+                                        {classItem.teacher_name || '—'}
                                     </TableCell>
                                     <TableCell align="center">
                                         {classItem.students_count || 0}
                                     </TableCell>
                                     <TableCell align="center">
                                         <Chip
-                                            label={classItem.is_active ? 'Активен' : 'Неактивен'}
-                                            color={classItem.is_active ? 'success' : 'default'}
+                                            label={classItem.is_active !== false ? 'Активен' : 'Неактивен'}
+                                            color={classItem.is_active !== false ? 'success' : 'default'}
                                             size="small"
                                             onClick={() => toggleActive(classItem)}
                                         />
@@ -230,20 +220,31 @@ const ClassSettings: React.FC = observer(() => {
                     <Box sx={{ pt: 2 }}>
                         <TextField
                             fullWidth
-                            label="Название класса"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            error={!!errors.name}
-                            helperText={errors.name}
+                            type="number"
+                            label="Класс"
+                            value={formData.grade}
+                            onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                            error={!!errors.grade}
+                            helperText={errors.grade}
                             sx={{ mb: 2 }}
+                            inputProps={{ min: 1, max: 11 }}
                         />
                         <TextField
                             fullWidth
-                            label="Описание"
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            multiline
-                            rows={3}
+                            label="Литера"
+                            value={formData.letter}
+                            onChange={(e) => setFormData({ ...formData, letter: e.target.value.toUpperCase() })}
+                            error={!!errors.letter}
+                            helperText={errors.letter || 'Например: А, Б, В'}
+                            sx={{ mb: 2 }}
+                            inputProps={{ maxLength: 1 }}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Классный руководитель"
+                            value={formData.teacher_name}
+                            onChange={(e) => setFormData({ ...formData, teacher_name: e.target.value })}
+                            helperText="ФИО классного руководителя"
                         />
                     </Box>
                 </DialogContent>

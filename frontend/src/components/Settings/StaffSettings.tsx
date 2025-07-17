@@ -24,6 +24,7 @@ import {
     Select,
     MenuItem,
     Grid,
+    CircularProgress,
 } from '@mui/material';
 import {
     Add,
@@ -34,25 +35,14 @@ import {
     Lock,
 } from '@mui/icons-material';
 import { useRootStore } from '../../stores/RootStore';
-
-interface StaffMember {
-    id: number;
-    username: string;
-    full_name: string;
-    email: string;
-    role: string;
-    is_active: boolean;
-    last_login?: string;
-    created_at: string;
-}
+import { LibraryUser } from '../../stores/SettingsStore';
 
 const StaffSettings: React.FC = observer(() => {
-    const { apiClient, uiStore } = useRootStore();
-    const [staff, setStaff] = useState<StaffMember[]>([]);
+    const { settingsStore } = useRootStore();
     const [dialogOpen, setDialogOpen] = useState(false);
     const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-    const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
-    const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+    const [editingStaff, setEditingStaff] = useState<LibraryUser | null>(null);
+    const [selectedStaff, setSelectedStaff] = useState<LibraryUser | null>(null);
     const [formData, setFormData] = useState({
         username: '',
         full_name: '',
@@ -65,27 +55,16 @@ const StaffSettings: React.FC = observer(() => {
         confirm_password: '',
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
-
-    const roles = [
-        { value: 'admin', label: 'Администратор' },
-        { value: 'librarian', label: 'Библиотекарь' },
-        { value: 'teacher', label: 'Учитель' },
-    ];
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         loadStaff();
     }, []);
 
     const loadStaff = async () => {
-        try {
-            uiStore.setLoading(true);
-            const response = await apiClient.get('/api/settings/staff');
-            setStaff(response.data || []);
-        } catch (error: any) {
-            uiStore.showNotification('Ошибка загрузки сотрудников', 'error');
-        } finally {
-            uiStore.setLoading(false);
-        }
+        setLoading(true);
+        await settingsStore.loadStaff();
+        setLoading(false);
     };
 
     const handleAdd = () => {
@@ -101,12 +80,12 @@ const StaffSettings: React.FC = observer(() => {
         setDialogOpen(true);
     };
 
-    const handleEdit = (staffMember: StaffMember) => {
+    const handleEdit = (staffMember: LibraryUser) => {
         setEditingStaff(staffMember);
         setFormData({
             username: staffMember.username,
             full_name: staffMember.full_name,
-            email: staffMember.email,
+            email: staffMember.email || '',
             role: staffMember.role,
             password: '',
         });
@@ -114,7 +93,7 @@ const StaffSettings: React.FC = observer(() => {
         setDialogOpen(true);
     };
 
-    const handleChangePassword = (staffMember: StaffMember) => {
+    const handleChangePassword = (staffMember: LibraryUser) => {
         setSelectedStaff(staffMember);
         setPasswordData({ new_password: '', confirm_password: '' });
         setErrors({});
@@ -126,13 +105,7 @@ const StaffSettings: React.FC = observer(() => {
             return;
         }
 
-        try {
-            await apiClient.delete(`/api/settings/staff/${id}`);
-            uiStore.showNotification('Сотрудник успешно удален', 'success');
-            loadStaff();
-        } catch (error: any) {
-            uiStore.showNotification(error.response?.data?.error || 'Ошибка удаления сотрудника', 'error');
-        }
+        await settingsStore.deleteStaff(id);
     };
 
     const validate = (): boolean => {
@@ -176,58 +149,45 @@ const StaffSettings: React.FC = observer(() => {
     const handleSave = async () => {
         if (!validate()) return;
 
-        try {
-            uiStore.setLoading(true);
-            if (editingStaff) {
-                await apiClient.put(`/api/settings/staff/${editingStaff.id}`, formData);
-                uiStore.showNotification('Сотрудник успешно обновлен', 'success');
-            } else {
-                await apiClient.post('/api/settings/staff', formData);
-                uiStore.showNotification('Сотрудник успешно добавлен', 'success');
-            }
+        const success = editingStaff
+            ? await settingsStore.updateStaff(editingStaff.id, formData)
+            : await settingsStore.createStaff(formData);
+
+        if (success) {
             setDialogOpen(false);
-            loadStaff();
-        } catch (error: any) {
-            uiStore.showNotification(error.response?.data?.error || 'Ошибка сохранения сотрудника', 'error');
-        } finally {
-            uiStore.setLoading(false);
         }
     };
 
     const handleSavePassword = async () => {
         if (!validatePassword() || !selectedStaff) return;
 
-        try {
-            uiStore.setLoading(true);
-            await apiClient.put(`/api/settings/staff/${selectedStaff.id}/password`, {
-                password: passwordData.new_password,
-            });
-            uiStore.showNotification('Пароль успешно изменен', 'success');
+        const success = await settingsStore.updateStaffPassword(
+            selectedStaff.id,
+            passwordData.new_password
+        );
+
+        if (success) {
             setPasswordDialogOpen(false);
-        } catch (error: any) {
-            uiStore.showNotification('Ошибка изменения пароля', 'error');
-        } finally {
-            uiStore.setLoading(false);
         }
     };
 
-    const toggleActive = async (staffMember: StaffMember) => {
-        try {
-            await apiClient.patch(`/api/settings/staff/${staffMember.id}/toggle-active`);
-            uiStore.showNotification(
-                staffMember.is_active ? 'Сотрудник деактивирован' : 'Сотрудник активирован',
-                'success'
-            );
-            loadStaff();
-        } catch (error: any) {
-            uiStore.showNotification('Ошибка изменения статуса сотрудника', 'error');
-        }
+    const toggleActive = async (staffMember: LibraryUser) => {
+        await settingsStore.toggleStaffActive(staffMember.id);
     };
 
     const getRoleLabel = (role: string) => {
+        const roles = settingsStore.getRoles();
         const roleObj = roles.find(r => r.value === role);
         return roleObj ? roleObj.label : role;
     };
+
+    if (loading) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+                <CircularProgress />
+            </Box>
+        );
+    }
 
     return (
         <Box>
@@ -255,7 +215,7 @@ const StaffSettings: React.FC = observer(() => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {staff.length === 0 ? (
+                        {settingsStore.libraryUsers.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={6} align="center">
                                     <Typography variant="body2" color="text.secondary">
@@ -264,7 +224,7 @@ const StaffSettings: React.FC = observer(() => {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            staff.map((member) => (
+                            settingsStore.libraryUsers.map((member) => (
                                 <TableRow key={member.id}>
                                     <TableCell>
                                         <Box display="flex" alignItems="center" gap={2}>
@@ -281,7 +241,7 @@ const StaffSettings: React.FC = observer(() => {
                                             </Box>
                                         </Box>
                                     </TableCell>
-                                    <TableCell>{member.email}</TableCell>
+                                    <TableCell>{member.email || '—'}</TableCell>
                                     <TableCell>
                                         <Chip
                                             label={getRoleLabel(member.role)}
@@ -297,8 +257,8 @@ const StaffSettings: React.FC = observer(() => {
                                     </TableCell>
                                     <TableCell align="center">
                                         <Chip
-                                            label={member.is_active ? 'Активен' : 'Заблокирован'}
-                                            color={member.is_active ? 'success' : 'default'}
+                                            label={member.is_active !== false ? 'Активен' : 'Заблокирован'}
+                                            color={member.is_active !== false ? 'success' : 'default'}
                                             size="small"
                                             onClick={() => toggleActive(member)}
                                         />
@@ -376,7 +336,7 @@ const StaffSettings: React.FC = observer(() => {
                                     label="Роль"
                                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                 >
-                                    {roles.map((role) => (
+                                    {settingsStore.getRoles().map((role) => (
                                         <MenuItem key={role.value} value={role.value}>
                                             {role.label}
                                         </MenuItem>

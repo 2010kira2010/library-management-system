@@ -17,6 +17,7 @@ import {
     Alert,
     IconButton,
     InputAdornment,
+    CircularProgress,
 } from '@mui/material';
 import {
     Save,
@@ -26,32 +27,11 @@ import {
     VisibilityOff,
 } from '@mui/icons-material';
 import { useRootStore } from '../../stores/RootStore';
-
-interface EmailConfig {
-    smtp_host: string;
-    smtp_port: number;
-    smtp_username: string;
-    smtp_password: string;
-    smtp_from: string;
-    smtp_from_name: string;
-    smtp_encryption: string;
-    smtp_enabled: boolean;
-
-    // Шаблоны уведомлений
-    notifications: {
-        loan_reminder: boolean;
-        overdue_notice: boolean;
-        new_book_arrival: boolean;
-        reader_registration: boolean;
-    };
-
-    // Настройки напоминаний
-    reminder_days_before: number;
-    overdue_check_time: string;
-}
+import { EmailConfig } from '../../stores/SettingsStore';
+import api from '../../services/api';
 
 const EmailSettings: React.FC = observer(() => {
-    const { apiClient, uiStore } = useRootStore();
+    const { uiStore } = useRootStore();
     const [formData, setFormData] = useState<EmailConfig>({
         smtp_host: '',
         smtp_port: 587,
@@ -75,6 +55,7 @@ const EmailSettings: React.FC = observer(() => {
     const [isEditing, setIsEditing] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [testEmailSending, setTestEmailSending] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         loadEmailConfig();
@@ -82,15 +63,15 @@ const EmailSettings: React.FC = observer(() => {
 
     const loadEmailConfig = async () => {
         try {
-            uiStore.setLoading(true);
-            const response = await apiClient.get('/api/settings/email');
+            setLoading(true);
+            const response = await api.getEmailSettings();
             const data = response.data || formData;
             setFormData(data);
             setOriginalData(data);
         } catch (error: any) {
             uiStore.showNotification('Ошибка загрузки настроек email', 'error');
         } finally {
-            uiStore.setLoading(false);
+            setLoading(false);
         }
     };
 
@@ -106,6 +87,10 @@ const EmailSettings: React.FC = observer(() => {
             }));
         } else {
             setFormData(prev => ({ ...prev, [field]: value }));
+        }
+
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: '' }));
         }
     };
 
@@ -145,15 +130,15 @@ const EmailSettings: React.FC = observer(() => {
         if (!validate()) return;
 
         try {
-            uiStore.setLoading(true);
-            await apiClient.put('/api/settings/email', formData);
+            setLoading(true);
+            await api.updateEmailSettings(formData);
             uiStore.showNotification('Настройки email успешно сохранены', 'success');
             setOriginalData(formData);
             setIsEditing(false);
         } catch (error: any) {
             uiStore.showNotification('Ошибка сохранения настроек email', 'error');
         } finally {
-            uiStore.setLoading(false);
+            setLoading(false);
         }
     };
 
@@ -162,7 +147,7 @@ const EmailSettings: React.FC = observer(() => {
 
         setTestEmailSending(true);
         try {
-            await apiClient.post('/api/settings/email/test', {
+            await api.testEmailSettings({
                 config: formData,
                 recipient: formData.smtp_from,
             });
@@ -177,6 +162,14 @@ const EmailSettings: React.FC = observer(() => {
         }
     };
 
+    if (loading) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+                <CircularProgress />
+            </Box>
+        );
+    }
+
     return (
         <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -188,7 +181,7 @@ const EmailSettings: React.FC = observer(() => {
                                 onClick={handleTestEmail}
                                 startIcon={<Send />}
                                 sx={{ mr: 1 }}
-                                disabled={!formData.smtp_enabled || testEmailSending}
+                                disabled={!formData.smtp_enabled || testEmailSending || loading}
                             >
                                 Тест
                             </Button>
@@ -196,6 +189,7 @@ const EmailSettings: React.FC = observer(() => {
                                 onClick={handleCancel}
                                 startIcon={<Cancel />}
                                 sx={{ mr: 1 }}
+                                disabled={loading}
                             >
                                 Отмена
                             </Button>
@@ -203,6 +197,7 @@ const EmailSettings: React.FC = observer(() => {
                                 variant="contained"
                                 onClick={handleSave}
                                 startIcon={<Save />}
+                                disabled={loading}
                             >
                                 Сохранить
                             </Button>

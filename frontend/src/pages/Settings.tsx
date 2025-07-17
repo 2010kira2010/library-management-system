@@ -52,37 +52,26 @@ function a11yProps(index: number) {
 const Settings: React.FC = observer(() => {
     const { settingsStore } = useRootStore();
     const [value, setValue] = useState(0);
+    const [initialLoadDone, setInitialLoadDone] = useState(false);
 
     // Загружаем настройки при монтировании компонента
     useEffect(() => {
-        settingsStore.loadSettings();
+        const loadInitialData = async () => {
+            await settingsStore.loadSettings();
+            setInitialLoadDone(true);
+        };
+        loadInitialData();
     }, [settingsStore]);
 
     const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);
     };
 
-    // Показываем загрузчик пока идет загрузка
-    if (settingsStore.isLoading) {
+    // Показываем загрузчик только при первой загрузке
+    if (!initialLoadDone && settingsStore.isLoading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
                 <CircularProgress />
-            </Box>
-        );
-    }
-
-    // Показываем ошибку если она есть
-    if (settingsStore.error) {
-        return (
-            <Box>
-                <Typography variant="h4" gutterBottom>
-                    Настройки системы
-                </Typography>
-                <Paper sx={{ p: 3, mt: 3 }}>
-                    <Typography color="error">
-                        Ошибка загрузки настроек: {settingsStore.error}
-                    </Typography>
-                </Paper>
             </Box>
         );
     }

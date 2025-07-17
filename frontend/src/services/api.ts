@@ -198,6 +198,80 @@ class ApiService {
         return this.api.post('/settings', data);
     }
 
+    // Organization Settings
+    async getOrganizationSettings() {
+        return this.api.get('/settings/organization');
+    }
+
+    async updateOrganizationSettings(data: any) {
+        return this.api.put('/settings/organization', data);
+    }
+
+    async uploadOrganizationLogo(formData: FormData) {
+        return this.api.post('/settings/organization/logo', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    }
+
+    // Email Settings
+    async getEmailSettings() {
+        return this.api.get('/settings/email');
+    }
+
+    async updateEmailSettings(data: any) {
+        return this.api.put('/settings/email', data);
+    }
+
+    async testEmailSettings(data: any) {
+        return this.api.post('/settings/email/test', data);
+    }
+
+    // Class Settings
+    async getClasses() {
+        return this.api.get('/settings/classes');
+    }
+
+    async createClass(data: any) {
+        return this.api.post('/settings/classes', data);
+    }
+
+    async updateClass(id: number, data: any) {
+        return this.api.put(`/settings/classes/${id}`, data);
+    }
+
+    async deleteClass(id: number) {
+        return this.api.delete(`/settings/classes/${id}`);
+    }
+
+    async toggleClassActive(id: number) {
+        return this.api.patch(`/settings/classes/${id}/toggle-active`);
+    }
+
+    // Staff Settings
+    async getStaff() {
+        return this.api.get('/settings/staff');
+    }
+
+    async createStaff(data: any) {
+        return this.api.post('/settings/staff', data);
+    }
+
+    async updateStaff(id: number, data: any) {
+        return this.api.put(`/settings/staff/${id}`, data);
+    }
+
+    async deleteStaff(id: number) {
+        return this.api.delete(`/settings/staff/${id}`);
+    }
+
+    async updateStaffPassword(id: number, data: any) {
+        return this.api.put(`/settings/staff/${id}/password`, data);
+    }
+
+    async toggleStaffActive(id: number) {
+        return this.api.patch(`/settings/staff/${id}/toggle-active`);
+    }
+
     // Dashboard
     async getDashboardStats() {
         return this.api.get('/dashboard/stats');
