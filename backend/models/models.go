@@ -138,6 +138,7 @@ type Settings struct {
 	OrganizationName      string    `json:"organization_name"`
 	OrganizationShortName string    `json:"organization_short_name"`
 	DirectorName          string    `json:"director_name"`
+	CreatedAt             time.Time `json:"created_at"`
 	UpdatedAt             time.Time `json:"updated_at"`
 }
 

@@ -1158,11 +1158,16 @@ func GetSettings() (*models.Settings, error) {
 	if err != nil {
 		// Если настроек нет, создаем пустые
 		if err == sql.ErrNoRows {
-			_, err = db.Exec("INSERT INTO settings DEFAULT VALUES")
+			_, err = db.Exec(`INSERT INTO settings (id, organization_name, organization_short_name) 
+				VALUES (1, 'Библиотека', 'Библиотека')`)
 			if err != nil {
 				return nil, err
 			}
-			return &models.Settings{ID: 1}, nil
+			return &models.Settings{
+				ID:                    1,
+				OrganizationName:      "Библиотека",
+				OrganizationShortName: "Библиотека",
+			}, nil
 		}
 		return nil, err
 	}
@@ -1208,6 +1213,11 @@ func GetClasses() ([]models.Class, error) {
 		classes = append(classes, class)
 	}
 
+	// Возвращаем пустой массив, если классов нет
+	if classes == nil {
+		classes = []models.Class{}
+	}
+
 	return classes, nil
 }
 
@@ -1229,6 +1239,11 @@ func GetLibraryUsers() ([]models.User, error) {
 			continue
 		}
 		users = append(users, user)
+	}
+
+	// Возвращаем пустой массив, если пользователей нет
+	if users == nil {
+		users = []models.User{}
 	}
 
 	return users, nil
@@ -1262,6 +1277,23 @@ CREATE TABLE IF NOT EXISTS users (
     full_name TEXT NOT NULL,
     role TEXT DEFAULT 'librarian',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_name TEXT,
+    organization_short_name TEXT,
+    director_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS classes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    grade INTEGER NOT NULL,
+    letter TEXT NOT NULL,
+    teacher_name TEXT,
+    UNIQUE(grade, letter)
 );
 
 CREATE TABLE IF NOT EXISTS books (
@@ -1339,7 +1371,36 @@ CREATE TABLE IF NOT EXISTS loans (
     status TEXT DEFAULT 'active'
 );
 
+CREATE TABLE IF NOT EXISTS disks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE,
+    title TEXT NOT NULL,
+    short_title TEXT,
+    publisher_id INTEGER,
+    subject TEXT,
+    resource_type TEXT,
+    barcode TEXT UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_by INTEGER,
+    comments TEXT
+);
+
+CREATE TABLE IF NOT EXISTS disk_loans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    disk_id INTEGER NOT NULL,
+    reader_id INTEGER NOT NULL,
+    issue_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    return_date DATETIME,
+    issued_by INTEGER NOT NULL,
+    returned_by INTEGER,
+    status TEXT DEFAULT 'active'
+);
+
 -- Создаем пользователя по умолчанию (пароль: admin)
 INSERT OR IGNORE INTO users (username, password_hash, full_name, role) 
 VALUES ('admin', '$2a$12$8y8HG8bKxOqGj50zi/LdeempqTKXnVi0Xfcz/vMzFexKEXXIDnVN2', 'Администратор', 'admin');
+
+-- Создаем настройки по умолчанию
+INSERT OR IGNORE INTO settings (id, organization_name, organization_short_name) 
+VALUES (1, 'Муниципальное бюджетное общеобразовательное учреждение средняя образовательная школа №3', 'МБОУСОШ №3');
 `

@@ -106,9 +106,20 @@ class SettingsStore {
         try {
             const response = await api.getSettings();
             runInAction(() => {
-                this.settings = response.data.settings;
+                this.settings = response.data.settings || null;
                 this.classes = response.data.classes || [];
                 this.libraryUsers = response.data.users || [];
+
+                // Убедимся, что classes всегда массив
+                if (!Array.isArray(this.classes)) {
+                    this.classes = [];
+                }
+
+                // Убедимся, что libraryUsers всегда массив
+                if (!Array.isArray(this.libraryUsers)) {
+                    this.libraryUsers = [];
+                }
+
                 this.isLoading = false;
                 this.error = null;
             });
@@ -116,6 +127,9 @@ class SettingsStore {
             runInAction(() => {
                 this.error = error.response?.data?.error || 'Ошибка загрузки настроек';
                 this.isLoading = false;
+                // Устанавливаем пустые массивы при ошибке
+                this.classes = [];
+                this.libraryUsers = [];
             });
         }
     }
@@ -139,17 +153,9 @@ class SettingsStore {
         }
     }
 
+
     // Методы для работы с классами
-    async loadClasses() {
-        try {
-            const response = await api.getClasses();
-            runInAction(() => {
-                this.classes = response.data || [];
-            });
-        } catch (error: any) {
-            this.rootStore.uiStore.showNotification('Ошибка загрузки классов', 'error');
-        }
-    }
+
 
     async createClass(classData: { grade: number; letter: string; teacher_name?: string }) {
         try {
@@ -215,7 +221,7 @@ class SettingsStore {
     async toggleClassActive(id: number) {
         try {
             await api.toggleClassActive(id);
-            await this.loadClasses();
+            await this.loadSettings();
             return true;
         } catch (error: any) {
             this.rootStore.uiStore.showNotification('Ошибка изменения статуса класса', 'error');

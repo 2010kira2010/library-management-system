@@ -12,24 +12,24 @@ func GetSettings(c *fiber.Ctx) error {
 	settings, err := database.GetSettings()
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to fetch settings",
+			"error":   "Failed to fetch settings",
+			"message": err.Error(),
 		})
 	}
 
 	classes, err := database.GetClasses()
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to fetch classes",
-		})
+		// Если ошибка, возвращаем пустой массив
+		classes = []models.Class{}
 	}
 
 	users, err := database.GetLibraryUsers()
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to fetch users",
-		})
+		// Если ошибка, возвращаем пустой массив
+		users = []models.User{}
 	}
 
+	// Убедимся, что возвращаем правильную структуру
 	return c.JSON(fiber.Map{
 		"settings": settings,
 		"classes":  classes,
